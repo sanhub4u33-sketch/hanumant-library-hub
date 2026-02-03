@@ -71,21 +71,21 @@ const HomePage = () => {
     <div className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass-effect">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full hero-gradient flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-primary-foreground" />
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <Link to="/" className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full hero-gradient flex items-center justify-center flex-shrink-0">
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
             </div>
-            <div>
-              <h1 className="font-display text-xl font-bold text-foreground">Shri Hanumant Library</h1>
-              <p className="text-xs text-muted-foreground">Mahmudabad's First Digital Library</p>
+            <div className="min-w-0">
+              <h1 className="font-display text-sm sm:text-xl font-bold text-foreground truncate">Shri Hanumant Library</h1>
+              <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block">Mahmudabad's First Digital Library</p>
             </div>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <Link to="/login">
-              <Button variant="outline" size="sm">Login</Button>
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm px-2 sm:px-4">Login</Button>
             </Link>
-            <a href="#contact">
+            <a href="#contact" className="hidden sm:block">
               <Button size="sm" className="btn-primary">Contact Us</Button>
             </a>
           </div>
@@ -110,7 +110,7 @@ const HomePage = () => {
               <span className="text-sm text-primary-foreground font-medium">First Digital Library in Mahmudabad</span>
             </div>
             
-            <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold text-primary-foreground mb-6 animate-slide-up">
+            <h1 className="font-display text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-primary-foreground mb-4 sm:mb-6 animate-slide-up">
               Your Gateway to
               <span className="block text-gradient bg-gradient-to-r from-accent via-primary to-accent bg-clip-text"> Success</span>
             </h1>
@@ -133,20 +133,20 @@ const HomePage = () => {
               </a>
             </div>
 
-            <div className="flex items-center gap-8 mt-12 animate-slide-up delay-300">
+            <div className="flex items-center gap-4 sm:gap-8 mt-8 sm:mt-12 animate-slide-up delay-300">
               <div className="text-center">
-                <p className="text-3xl font-bold text-primary-foreground">24/7</p>
-                <p className="text-sm text-primary-foreground/70">Open Hours</p>
+                <p className="text-2xl sm:text-3xl font-bold text-primary-foreground">24/7</p>
+                <p className="text-xs sm:text-sm text-primary-foreground/70">Open Hours</p>
               </div>
-              <div className="w-px h-12 bg-primary-foreground/30" />
+              <div className="w-px h-8 sm:h-12 bg-primary-foreground/30" />
               <div className="text-center">
-                <p className="text-3xl font-bold text-primary-foreground">100+</p>
-                <p className="text-sm text-primary-foreground/70">Active Members</p>
+                <p className="text-2xl sm:text-3xl font-bold text-primary-foreground">100+</p>
+                <p className="text-xs sm:text-sm text-primary-foreground/70">Active Members</p>
               </div>
-              <div className="w-px h-12 bg-primary-foreground/30" />
+              <div className="w-px h-8 sm:h-12 bg-primary-foreground/30" />
               <div className="text-center">
-                <p className="text-3xl font-bold text-primary-foreground">50+</p>
-                <p className="text-sm text-primary-foreground/70">Seats Available</p>
+                <p className="text-2xl sm:text-3xl font-bold text-primary-foreground">50+</p>
+                <p className="text-xs sm:text-sm text-primary-foreground/70">Seats Available</p>
               </div>
             </div>
           </div>

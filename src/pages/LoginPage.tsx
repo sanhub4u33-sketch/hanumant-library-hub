@@ -42,52 +42,52 @@ const LoginPage = () => {
         <div className="w-full max-w-md">
           <button 
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 sm:mb-8 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Home
           </button>
 
-          <div className="card-elevated p-8 text-center">
-            <div className="w-16 h-16 rounded-full hero-gradient flex items-center justify-center mx-auto mb-6">
-              <BookOpen className="w-8 h-8 text-primary-foreground" />
+          <div className="card-elevated p-5 sm:p-8 text-center">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full hero-gradient flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
             </div>
             
-            <h1 className="font-display text-2xl font-bold text-foreground mb-2">
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground mb-2">
               Welcome Back
             </h1>
-            <p className="text-muted-foreground mb-8">
+            <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
               Select how you want to login
             </p>
 
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               <Button
                 variant="outline"
                 size="lg"
-                className="h-auto py-6 flex items-center gap-4 justify-start px-6 hover:border-primary hover:bg-primary/5"
+                className="h-auto py-4 sm:py-6 flex items-center gap-3 sm:gap-4 justify-start px-4 sm:px-6 hover:border-primary hover:bg-primary/5"
                 onClick={() => setLoginType('admin')}
               >
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Shield className="w-6 h-6 text-primary" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                 </div>
-                <div className="text-left">
-                  <p className="font-semibold text-foreground">Admin Login</p>
-                  <p className="text-sm text-muted-foreground">Manage library & members</p>
+                <div className="text-left min-w-0">
+                  <p className="font-semibold text-foreground text-sm sm:text-base">Admin Login</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Manage library & members</p>
                 </div>
               </Button>
 
               <Button
                 variant="outline"
                 size="lg"
-                className="h-auto py-6 flex items-center gap-4 justify-start px-6 hover:border-primary hover:bg-primary/5"
+                className="h-auto py-4 sm:py-6 flex items-center gap-3 sm:gap-4 justify-start px-4 sm:px-6 hover:border-primary hover:bg-primary/5"
                 onClick={() => setLoginType('user')}
               >
-                <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center">
-                  <User className="w-6 h-6 text-accent-foreground" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-5 h-5 sm:w-6 sm:h-6 text-accent-foreground" />
                 </div>
-                <div className="text-left">
-                  <p className="font-semibold text-foreground">Member Login</p>
-                  <p className="text-sm text-muted-foreground">View attendance & dues</p>
+                <div className="text-left min-w-0">
+                  <p className="font-semibold text-foreground text-sm sm:text-base">Member Login</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">View attendance & fees</p>
                 </div>
               </Button>
             </div>
@@ -102,32 +102,32 @@ const LoginPage = () => {
       <div className="w-full max-w-md">
         <button 
           onClick={() => setLoginType(null)}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 sm:mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to options
         </button>
 
-        <div className="card-elevated p-8">
-          <div className="text-center mb-8">
-            <div className={`w-16 h-16 rounded-full ${loginType === 'admin' ? 'bg-primary/10' : 'bg-accent/20'} flex items-center justify-center mx-auto mb-4`}>
+        <div className="card-elevated p-5 sm:p-8">
+          <div className="text-center mb-6 sm:mb-8">
+            <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full ${loginType === 'admin' ? 'bg-primary/10' : 'bg-accent/20'} flex items-center justify-center mx-auto mb-3 sm:mb-4`}>
               {loginType === 'admin' ? (
-                <Shield className="w-8 h-8 text-primary" />
+                <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
               ) : (
-                <User className="w-8 h-8 text-accent-foreground" />
+                <User className="w-6 h-6 sm:w-8 sm:h-8 text-accent-foreground" />
               )}
             </div>
-            <h1 className="font-display text-2xl font-bold text-foreground">
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">
               {loginType === 'admin' ? 'Admin Login' : 'Member Login'}
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Enter your credentials to continue
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -140,7 +140,7 @@ const LoginPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -163,7 +163,7 @@ const LoginPage = () => {
           </form>
 
           {loginType === 'user' && (
-            <p className="text-center text-sm text-muted-foreground mt-6">
+            <p className="text-center text-xs sm:text-sm text-muted-foreground mt-4 sm:mt-6">
               Don't have an account? Contact the library admin.
             </p>
           )}

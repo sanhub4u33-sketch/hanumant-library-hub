@@ -2,12 +2,9 @@ import { useState } from 'react';
 import { 
   UserPlus, 
   Trash2, 
-  Edit, 
   Phone, 
   Mail,
-  Calendar,
-  Eye,
-  X
+  Calendar
 } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -27,18 +24,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useMembers } from '@/hooks/useFirebaseData';
+import { useMembers, useDues, useAttendance } from '@/hooks/useFirebaseData';
 import { Member } from '@/types/library';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import MemberDetailModal from '@/components/admin/MemberDetailModal';
 
 const MembersPage = () => {
-  const { members, loading, addMember, updateMember, deleteMember } = useMembers();
+  const { members, loading, addMember, deleteMember } = useMembers();
+  const { dues, createInitialFee, getMemberDues } = useDues();
+  const { getMemberAttendance } = useAttendance();
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -73,14 +73,16 @@ const MembersPage = () => {
   const handleAddMember = async () => {
     try {
       // Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(
+      await createUserWithEmailAndPassword(
         auth, 
         formData.email, 
         formData.password
       );
 
+      const joinDate = new Date().toISOString().split('T')[0];
+
       // Add member to database
-      await addMember({
+      const memberId = await addMember({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
@@ -89,8 +91,19 @@ const MembersPage = () => {
         shift: formData.shift,
         monthlyFee: formData.monthlyFee,
         status: 'active',
-        joinDate: new Date().toISOString().split('T')[0],
+        joinDate,
+        password: formData.password, // Store for admin to view/edit
       });
+
+      // Create initial fee for the member
+      if (memberId) {
+        await createInitialFee(
+          memberId,
+          formData.name,
+          formData.monthlyFee,
+          joinDate
+        );
+      }
 
       toast.success(`Member added! Login credentials:\nEmail: ${formData.email}\nPassword: ${formData.password}`);
       setShowAddDialog(false);
@@ -101,7 +114,8 @@ const MembersPage = () => {
     }
   };
 
-  const handleDeleteMember = async (member: Member) => {
+  const handleDeleteMember = async (member: Member, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (confirm(`Are you sure you want to remove ${member.name}?`)) {
       try {
         await deleteMember(member.id, member.name);
@@ -112,9 +126,9 @@ const MembersPage = () => {
     }
   };
 
-  const handleViewMember = (member: Member) => {
+  const handleMemberClick = (member: Member) => {
     setSelectedMember(member);
-    setShowViewDialog(true);
+    setShowDetailModal(true);
   };
 
   return (
@@ -146,11 +160,19 @@ const MembersPage = () => {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredMembers.map((member) => (
-            <div key={member.id} className="card-elevated p-5">
+            <div 
+              key={member.id} 
+              className="card-elevated p-5 cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => handleMemberClick(member)}
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full hero-gradient flex items-center justify-center text-primary-foreground font-bold">
-                    {member.name.charAt(0).toUpperCase()}
+                  <div className="w-12 h-12 rounded-full hero-gradient flex items-center justify-center text-primary-foreground font-bold overflow-hidden">
+                    {member.profilePic ? (
+                      <img src={member.profilePic} alt={member.name} className="w-full h-full object-cover" />
+                    ) : (
+                      member.name.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">{member.name}</h3>
@@ -185,16 +207,18 @@ const MembersPage = () => {
                   variant="outline" 
                   size="sm" 
                   className="flex-1"
-                  onClick={() => handleViewMember(member)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMemberClick(member);
+                  }}
                 >
-                  <Eye className="w-4 h-4 mr-1" />
-                  View
+                  View Details
                 </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
                   className="text-destructive hover:bg-destructive/10"
-                  onClick={() => handleDeleteMember(member)}
+                  onClick={(e) => handleDeleteMember(member, e)}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -309,74 +333,14 @@ const MembersPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Member Dialog */}
-      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display">Member Details</DialogTitle>
-          </DialogHeader>
-          
-          {selectedMember && (
-            <div className="space-y-4 py-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full hero-gradient flex items-center justify-center text-primary-foreground text-2xl font-bold">
-                  {selectedMember.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="font-display text-xl font-semibold">{selectedMember.name}</h3>
-                  <span className={`text-sm px-2 py-0.5 rounded-full ${
-                    selectedMember.status === 'active' 
-                      ? 'bg-success/10 text-success' 
-                      : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {selectedMember.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{selectedMember.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{selectedMember.phone}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Seat Number</p>
-                  <p className="font-medium">{selectedMember.seatNumber || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Shift</p>
-                  <p className="font-medium capitalize">{selectedMember.shift || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Monthly Fee</p>
-                  <p className="font-medium">₹{selectedMember.monthlyFee}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Join Date</p>
-                  <p className="font-medium">{format(new Date(selectedMember.joinDate), 'MMM d, yyyy')}</p>
-                </div>
-              </div>
-
-              {selectedMember.address && (
-                <div className="pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground">Address</p>
-                  <p className="font-medium">{selectedMember.address}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowViewDialog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Member Detail Modal */}
+      <MemberDetailModal
+        member={selectedMember}
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        memberDues={selectedMember ? getMemberDues(selectedMember.id) : []}
+        memberAttendance={selectedMember ? getMemberAttendance(selectedMember.id) : []}
+      />
     </AdminLayout>
   );
 };

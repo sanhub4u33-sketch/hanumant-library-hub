@@ -1,4 +1,3 @@
-import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Users, 
@@ -14,11 +13,11 @@ import {
 } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { useMembers, useAttendance, useDues, useActivities } from '@/hooks/useFirebaseData';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 const AdminDashboard = () => {
   const { members } = useMembers();
-  const { attendance, getTodayAttendance } = useAttendance();
+  const { getTodayAttendance } = useAttendance();
   const { dues, getPendingDues } = useDues();
   const { activities } = useActivities();
 
@@ -153,17 +152,17 @@ const AdminDashboard = () => {
           )}
         </div>
 
-        {/* Pending Dues */}
+        {/* Pending Fees */}
         <div className="card-elevated p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display text-xl font-semibold text-foreground">Pending Dues</h2>
+            <h2 className="font-display text-xl font-semibold text-foreground">Pending Fees</h2>
             <Link to="/admin/dues" className="text-primary hover:underline text-sm flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
           {pendingDues.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No pending dues</p>
+            <p className="text-muted-foreground text-center py-8">No pending fees</p>
           ) : (
             <div className="space-y-3 max-h-80 overflow-y-auto">
               {pendingDues.slice(0, 5).map((due) => (
@@ -173,7 +172,9 @@ const AdminDashboard = () => {
                 >
                   <div>
                     <p className="font-medium text-foreground">{due.memberName}</p>
-                    <p className="text-sm text-muted-foreground">{due.month}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {format(parseISO(due.periodStart), 'dd MMM')} - {format(parseISO(due.periodEnd), 'dd MMM')}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-destructive">₹{due.amount}</p>

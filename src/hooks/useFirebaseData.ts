@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ref, onValue, push, set, update, remove, get } from 'firebase/database';
 import { database } from '@/lib/firebase';
-import { Member, AttendanceRecord, DuesRecord, Activity } from '@/types/library';
+import { Member, AttendanceRecord, FeeRecord, Activity } from '@/types/library';
+import { addDays, format, differenceInDays, isAfter, parseISO } from 'date-fns';
 
 export const useMembers = () => {
   const [members, setMembers] = useState<Member[]>([]);
@@ -169,7 +170,7 @@ export const useAttendance = () => {
 };
 
 export const useDues = () => {
-  const [dues, setDues] = useState<DuesRecord[]>([]);
+  const [dues, setDues] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -179,8 +180,17 @@ export const useDues = () => {
       if (data) {
         const duesList = Object.entries(data).map(([id, record]) => ({
           id,
-          ...(record as Omit<DuesRecord, 'id'>),
+          ...(record as Omit<FeeRecord, 'id'>),
         }));
+        // Check for overdue fees
+        const today = new Date().toISOString().split('T')[0];
+        duesList.forEach(due => {
+          if (due.status === 'pending' && due.dueDate < today) {
+            // Mark as overdue
+            const dueRef = ref(database, `dues/${due.id}`);
+            update(dueRef, { status: 'overdue' });
+          }
+        });
         setDues(duesList);
       } else {
         setDues([]);
@@ -191,14 +201,58 @@ export const useDues = () => {
     return () => unsubscribe();
   }, []);
 
-  const addDue = async (due: Omit<DuesRecord, 'id'>) => {
+  const addDue = async (due: Omit<FeeRecord, 'id'>) => {
     const duesRef = ref(database, 'dues');
     const newDueRef = push(duesRef);
     await set(newDueRef, due);
     return newDueRef.key;
   };
 
-  const markAsPaid = async (dueId: string, memberId: string, memberName: string, amount: number) => {
+  // Create initial fee when member joins
+  const createInitialFee = async (memberId: string, memberName: string, amount: number, joinDate: string) => {
+    const periodStart = joinDate;
+    const periodEnd = format(addDays(parseISO(joinDate), 30), 'yyyy-MM-dd');
+    const dueDate = periodEnd;
+
+    await addDue({
+      memberId,
+      memberName,
+      periodStart,
+      periodEnd,
+      amount,
+      dueDate,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  // Create next 30-day fee after payment
+  const createNextCycleFee = async (memberId: string, memberName: string, amount: number, previousPeriodEnd: string) => {
+    const periodStart = previousPeriodEnd;
+    const periodEnd = format(addDays(parseISO(previousPeriodEnd), 30), 'yyyy-MM-dd');
+    const dueDate = periodEnd;
+
+    // Check if this fee already exists
+    const existingFee = dues.find(d => 
+      d.memberId === memberId && 
+      d.periodStart === periodStart
+    );
+    
+    if (!existingFee) {
+      await addDue({
+        memberId,
+        memberName,
+        periodStart,
+        periodEnd,
+        amount,
+        dueDate,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+    }
+  };
+
+  const markAsPaid = async (dueId: string, memberId: string, memberName: string, amount: number, periodEnd: string) => {
     const receiptNumber = `RCP-${Date.now()}`;
     const paidDate = new Date().toISOString();
     
@@ -216,6 +270,9 @@ export const useDues = () => {
       timestamp: paidDate,
       details: `Payment of ₹${amount} received from ${memberName}`,
     });
+
+    // Create next cycle fee automatically
+    await createNextCycleFee(memberId, memberName, amount, periodEnd);
     
     return receiptNumber;
   };
@@ -228,7 +285,7 @@ export const useDues = () => {
     return dues.filter(due => due.status === 'pending' || due.status === 'overdue');
   };
 
-  return { dues, loading, addDue, markAsPaid, getMemberDues, getPendingDues };
+  return { dues, loading, addDue, markAsPaid, getMemberDues, getPendingDues, createInitialFee, createNextCycleFee };
 };
 
 export const useActivities = () => {

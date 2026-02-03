@@ -1,9 +1,7 @@
 import { useState, useMemo } from 'react';
 import { 
   FileText,
-  Download,
-  Printer,
-  Calendar
+  Printer
 } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -21,7 +19,7 @@ const ReceiptsPage = () => {
   const { dues } = useDues();
   const { members } = useMembers();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
 
   const paidDues = useMemo(() => {
     return dues
@@ -32,8 +30,8 @@ const ReceiptsPage = () => {
   const filteredReceipts = useMemo(() => {
     let filtered = paidDues;
 
-    if (selectedMonth !== 'all') {
-      filtered = filtered.filter(due => due.month === selectedMonth);
+    if (selectedPeriod !== 'all') {
+      filtered = filtered.filter(due => due.periodStart.startsWith(selectedPeriod.slice(0, 7)));
     }
 
     if (searchQuery) {
@@ -44,11 +42,11 @@ const ReceiptsPage = () => {
     }
 
     return filtered;
-  }, [paidDues, selectedMonth, searchQuery]);
+  }, [paidDues, selectedPeriod, searchQuery]);
 
-  const availableMonths = useMemo(() => {
-    const months = new Set(paidDues.map(due => due.month));
-    return Array.from(months).sort().reverse();
+  const availablePeriods = useMemo(() => {
+    const periods = new Set(paidDues.map(due => due.periodStart.slice(0, 7)));
+    return Array.from(periods).sort().reverse();
   }, [paidDues]);
 
   const printReceipt = (due: typeof paidDues[0]) => {
@@ -158,8 +156,8 @@ const ReceiptsPage = () => {
               <span>${member?.email || 'N/A'}</span>
             </div>
             <div class="detail-item">
-              <label>Month</label>
-              <span>${format(new Date(due.month + '-01'), 'MMMM yyyy')}</span>
+              <label>Fee Period</label>
+              <span>${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM yyyy')}</span>
             </div>
             <div class="detail-item">
               <label>Payment Date</label>
@@ -192,15 +190,15 @@ const ReceiptsPage = () => {
       {/* Filters */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by month" />
+              <SelectValue placeholder="Filter by period" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Months</SelectItem>
-              {availableMonths.map((month) => (
-                <SelectItem key={month} value={month}>
-                  {format(new Date(month + '-01'), 'MMMM yyyy')}
+              <SelectItem value="all">All Periods</SelectItem>
+              {availablePeriods.map((period) => (
+                <SelectItem key={period} value={period}>
+                  {format(new Date(period + '-01'), 'MMMM yyyy')}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -238,8 +236,10 @@ const ReceiptsPage = () => {
                   <span className="font-medium">{due.memberName}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Month</span>
-                  <span>{format(new Date(due.month + '-01'), 'MMM yyyy')}</span>
+                  <span className="text-sm text-muted-foreground">Period</span>
+                  <span className="text-sm">
+                    {format(parseISO(due.periodStart), 'dd MMM')} - {format(parseISO(due.periodEnd), 'dd MMM')}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Amount</span>
