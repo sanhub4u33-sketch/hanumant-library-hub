@@ -5,7 +5,8 @@ import {
   CheckCircle,
   Clock,
   AlertTriangle,
-  User
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -27,19 +28,19 @@ import {
 } from '@/components/ui/select';
 import { useMembers, useDues } from '@/hooks/useFirebaseData';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO, subWeeks, subMonths, subYears, isAfter } from 'date-fns';
 
 const DuesPage = () => {
   const { members } = useMembers();
-  const { dues, loading, addDue, markAsPaid, getMemberDues } = useDues();
+  const { dues, loading, markAsPaid, createInitialFee } = useDues();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [formData, setFormData] = useState({
     memberId: '',
-    month: format(new Date(), 'yyyy-MM'),
+    periodStart: format(new Date(), 'yyyy-MM-dd'),
+    periodEnd: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     amount: 500,
-    dueDate: format(new Date(new Date().setDate(10)), 'yyyy-MM-dd'),
   });
 
   const filteredDues = useMemo(() => {
@@ -60,7 +61,7 @@ const DuesPage = () => {
       if (a.status !== 'overdue' && b.status === 'overdue') return 1;
       if (a.status === 'pending' && b.status === 'paid') return -1;
       if (a.status === 'paid' && b.status === 'pending') return 1;
-      return new Date(b.month).getTime() - new Date(a.month).getTime();
+      return new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime();
     });
   }, [dues, filterStatus, searchQuery]);
 
@@ -82,35 +83,83 @@ const DuesPage = () => {
     }
 
     try {
-      await addDue({
-        memberId: formData.memberId,
-        memberName: member.name,
-        month: formData.month,
-        amount: formData.amount,
-        dueDate: formData.dueDate,
-        status: 'pending',
-      });
+      await createInitialFee(
+        formData.memberId,
+        member.name,
+        formData.amount,
+        formData.periodStart
+      );
 
-      toast.success('Due added successfully');
+      toast.success('Fee added successfully');
       setShowAddDialog(false);
       setFormData({
         memberId: '',
-        month: format(new Date(), 'yyyy-MM'),
+        periodStart: format(new Date(), 'yyyy-MM-dd'),
+        periodEnd: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
         amount: 500,
-        dueDate: format(new Date(new Date().setDate(10)), 'yyyy-MM-dd'),
       });
     } catch (error) {
-      toast.error('Failed to add due');
+      toast.error('Failed to add fee');
     }
   };
 
-  const handleMarkPaid = async (dueId: string, memberId: string, memberName: string, amount: number) => {
+  const handleMarkPaid = async (dueId: string, memberId: string, memberName: string, amount: number, periodEnd: string) => {
     try {
-      const receiptNumber = await markAsPaid(dueId, memberId, memberName, amount);
+      const receiptNumber = await markAsPaid(dueId, memberId, memberName, amount, periodEnd);
       toast.success(`Payment recorded. Receipt: ${receiptNumber}`);
     } catch (error) {
       toast.error('Failed to mark as paid');
     }
+  };
+
+  // Transaction History Export Functions
+  const exportToExcel = (period: 'weekly' | 'monthly' | 'yearly') => {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (period) {
+      case 'weekly':
+        startDate = subWeeks(now, 1);
+        break;
+      case 'monthly':
+        startDate = subMonths(now, 1);
+        break;
+      case 'yearly':
+        startDate = subYears(now, 1);
+        break;
+    }
+
+    const paidInPeriod = dues.filter(due => 
+      due.status === 'paid' && 
+      due.paidDate && 
+      isAfter(parseISO(due.paidDate), startDate)
+    );
+
+    if (paidInPeriod.length === 0) {
+      toast.error(`No transactions found for ${period} period`);
+      return;
+    }
+
+    // Create CSV
+    const headers = ['Receipt No', 'Member Name', 'Period', 'Amount', 'Paid Date'];
+    const rows = paidInPeriod.map(due => [
+      due.receiptNumber || '',
+      due.memberName,
+      `${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM yyyy')}`,
+      `₹${due.amount}`,
+      due.paidDate ? format(parseISO(due.paidDate), 'dd MMM yyyy') : ''
+    ]);
+
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fee_transactions_${period}_${format(now, 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast.success(`${period.charAt(0).toUpperCase() + period.slice(1)} report downloaded`);
   };
 
   const getStatusIcon = (status: string) => {
@@ -124,7 +173,7 @@ const DuesPage = () => {
 
   return (
     <AdminLayout 
-      title="Dues & Fees" 
+      title="Fee Management" 
       searchPlaceholder="Search member..."
       onSearch={setSearchQuery}
     >
@@ -151,9 +200,30 @@ const DuesPage = () => {
         <div className="stat-card">
           <div className="flex items-center gap-3 mb-2">
             <CheckCircle className="w-5 h-5 text-success" />
-            <span className="text-muted-foreground">Paid This Month</span>
+            <span className="text-muted-foreground">Paid</span>
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.paid.length}</p>
+        </div>
+      </div>
+
+      {/* Transaction History Export */}
+      <div className="card-elevated p-4 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h3 className="font-semibold text-foreground">Transaction History Export</h3>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => exportToExcel('weekly')} className="gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              Weekly
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportToExcel('monthly')} className="gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              Monthly
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportToExcel('yearly')} className="gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              Yearly
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -175,7 +245,7 @@ const DuesPage = () => {
 
         <Button onClick={() => setShowAddDialog(true)} className="btn-primary gap-2">
           <Plus className="w-4 h-4" />
-          Add Due
+          Add Fee
         </Button>
       </div>
 
@@ -186,7 +256,7 @@ const DuesPage = () => {
             <thead>
               <tr className="border-b border-border bg-secondary/50">
                 <th className="text-left p-4 font-medium text-muted-foreground">Member</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Month</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Period</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Amount</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Due Date</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
@@ -203,7 +273,7 @@ const DuesPage = () => {
               ) : filteredDues.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                    No dues found
+                    No fees found
                   </td>
                 </tr>
               ) : (
@@ -217,9 +287,11 @@ const DuesPage = () => {
                         {due.memberName}
                       </div>
                     </td>
-                    <td className="p-4">{format(new Date(due.month + '-01'), 'MMMM yyyy')}</td>
+                    <td className="p-4 text-sm">
+                      {format(parseISO(due.periodStart), 'dd MMM')} - {format(parseISO(due.periodEnd), 'dd MMM yyyy')}
+                    </td>
                     <td className="p-4 font-semibold">₹{due.amount}</td>
-                    <td className="p-4">{format(new Date(due.dueDate), 'dd MMM yyyy')}</td>
+                    <td className="p-4">{format(parseISO(due.dueDate), 'dd MMM yyyy')}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         {getStatusIcon(due.status)}
@@ -236,7 +308,7 @@ const DuesPage = () => {
                       {due.status !== 'paid' && (
                         <Button 
                           size="sm" 
-                          onClick={() => handleMarkPaid(due.id, due.memberId, due.memberName, due.amount)}
+                          onClick={() => handleMarkPaid(due.id, due.memberId, due.memberName, due.amount, due.periodEnd)}
                           className="gap-1"
                         >
                           <CheckCircle className="w-4 h-4" />
@@ -261,7 +333,7 @@ const DuesPage = () => {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-display">Add New Due</DialogTitle>
+            <DialogTitle className="font-display">Add New Fee</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
@@ -292,11 +364,30 @@ const DuesPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Month</Label>
+              <Label>Period Start Date</Label>
               <Input
-                type="month"
-                value={formData.month}
-                onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+                type="date"
+                value={formData.periodStart}
+                onChange={(e) => {
+                  const start = e.target.value;
+                  const endDate = new Date(start);
+                  endDate.setDate(endDate.getDate() + 30);
+                  setFormData({ 
+                    ...formData, 
+                    periodStart: start,
+                    periodEnd: format(endDate, 'yyyy-MM-dd')
+                  });
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Period End Date (30 days)</Label>
+              <Input
+                type="date"
+                value={formData.periodEnd}
+                disabled
+                className="bg-secondary/50"
               />
             </div>
 
@@ -308,15 +399,6 @@ const DuesPage = () => {
                 onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              />
-            </div>
           </div>
 
           <DialogFooter>
@@ -324,7 +406,7 @@ const DuesPage = () => {
               Cancel
             </Button>
             <Button onClick={handleAddDue} className="btn-primary">
-              Add Due
+              Add Fee
             </Button>
           </DialogFooter>
         </DialogContent>

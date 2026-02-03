@@ -10,6 +10,8 @@ export interface Member {
   monthlyFee: number;
   status: 'active' | 'inactive';
   createdAt: string;
+  profilePic?: string; // base64 compressed image
+  password?: string; // stored for admin to view/edit
 }
 
 export interface AttendanceRecord {
@@ -22,17 +24,22 @@ export interface AttendanceRecord {
   duration?: number; // in minutes
 }
 
-export interface DuesRecord {
+export interface FeeRecord {
   id: string;
   memberId: string;
   memberName: string;
-  month: string; // YYYY-MM format
+  periodStart: string; // YYYY-MM-DD format - start of 30 day period
+  periodEnd: string; // YYYY-MM-DD format - end of 30 day period
   amount: number;
   dueDate: string;
   paidDate?: string;
   status: 'pending' | 'paid' | 'overdue';
   receiptNumber?: string;
+  createdAt: string;
 }
+
+// Keep for backward compatibility
+export type DuesRecord = FeeRecord;
 
 export interface Receipt {
   id: string;
