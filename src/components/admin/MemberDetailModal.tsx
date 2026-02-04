@@ -132,46 +132,54 @@ const MemberDetailModal = ({
     
     setIsSaving(true);
     const currentAdminEmail = auth.currentUser?.email;
+    const currentAdminUid = auth.currentUser?.uid;
     
     try {
       // Check if email or password changed
       const emailChanged = editData.email !== member.email;
       const passwordChanged = editData.password !== member.password && editData.password !== '';
       
+      let authUpdateSuccess = true;
+      let authUpdateError = '';
+      
       if (emailChanged || passwordChanged) {
         // We need to sign in as the member to update their credentials
         if (!member.password) {
-          toast.error('Cannot update credentials: member password not stored');
-          setIsSaving(false);
-          return;
-        }
-        
-        // Temporarily sign in as the member
-        await signInWithEmailAndPassword(auth, member.email, member.password);
-        
-        try {
-          // Update email if changed
-          if (emailChanged && auth.currentUser) {
-            await updateEmail(auth.currentUser, editData.email);
-          }
-          
-          // Update password if changed
-          if (passwordChanged && auth.currentUser) {
-            await updatePassword(auth.currentUser, editData.password);
-          }
-        } finally {
-          // Sign out from member account
-          await signOut(auth);
-          
-          // Sign back in as admin
-          if (currentAdminEmail) {
-            // Note: We need admin password - using a workaround
-            // The page will reload for admin to re-login
+          // Just update database, warn about auth
+          authUpdateSuccess = false;
+          authUpdateError = 'Stored password missing - only database record will be updated';
+        } else {
+          try {
+            // Temporarily sign in as the member
+            await signInWithEmailAndPassword(auth, member.email, member.password);
+            
+            try {
+              // Update email if changed
+              if (emailChanged && auth.currentUser) {
+                await updateEmail(auth.currentUser, editData.email);
+              }
+              
+              // Update password if changed
+              if (passwordChanged && auth.currentUser) {
+                await updatePassword(auth.currentUser, editData.password);
+              }
+            } finally {
+              // Sign out from member account
+              await signOut(auth);
+            }
+          } catch (authError: any) {
+            console.error('Auth update failed:', authError);
+            authUpdateSuccess = false;
+            if (authError.code === 'auth/invalid-credential' || authError.code === 'auth/invalid-login-credentials') {
+              authUpdateError = 'Stored password is outdated. Database updated but Firebase Auth credentials unchanged. Member should use "Forgot Password" to reset.';
+            } else {
+              authUpdateError = authError.message || 'Could not update auth credentials';
+            }
           }
         }
       }
       
-      // Update database record
+      // Always update database record
       const memberRef = ref(database, `members/${member.id}`);
       await update(memberRef, {
         email: editData.email,
@@ -182,13 +190,17 @@ const MemberDetailModal = ({
         monthlyFee: editData.monthlyFee,
       });
       
-      toast.success('Member updated successfully! Please re-login as admin if you changed credentials.');
-      setIsEditing(false);
-      
-      if (emailChanged || passwordChanged) {
-        // Reload to force admin re-login
+      if (authUpdateSuccess && (emailChanged || passwordChanged)) {
+        toast.success('Member updated successfully! Credentials synced with Firebase Auth. Please re-login.');
         window.location.reload();
+      } else if (!authUpdateSuccess && (emailChanged || passwordChanged)) {
+        toast.warning(authUpdateError, { duration: 8000 });
+        toast.info('Database record updated. For auth sync, ask member to reset password via login page.');
+      } else {
+        toast.success('Member updated successfully');
       }
+      
+      setIsEditing(false);
     } catch (error: any) {
       console.error('Error updating member:', error);
       toast.error(error.message || 'Failed to update member');
