@@ -165,7 +165,7 @@ const AdminDashboard = () => {
             <p className="text-muted-foreground text-center py-8">No pending fees</p>
           ) : (
             <div className="space-y-3 max-h-80 overflow-y-auto">
-              {pendingDues.slice(0, 5).map((due) => (
+            {pendingDues.slice(0, 5).map((due) => (
                 <div 
                   key={due.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
@@ -173,7 +173,9 @@ const AdminDashboard = () => {
                   <div>
                     <p className="font-medium text-foreground">{due.memberName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {format(parseISO(due.periodStart), 'dd MMM')} - {format(parseISO(due.periodEnd), 'dd MMM')}
+                      {due.periodStart && due.periodEnd 
+                        ? `${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM')}`
+                        : 'Period not set'}
                     </p>
                   </div>
                   <div className="text-right">

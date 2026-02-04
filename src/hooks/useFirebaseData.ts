@@ -185,7 +185,7 @@ export const useDues = () => {
         // Check for overdue fees
         const today = new Date().toISOString().split('T')[0];
         duesList.forEach(due => {
-          if (due.status === 'pending' && due.dueDate < today) {
+          if (due.status === 'pending' && due.dueDate && due.dueDate < today) {
             // Mark as overdue
             const dueRef = ref(database, `dues/${due.id}`);
             update(dueRef, { status: 'overdue' });
