@@ -252,25 +252,18 @@ const MemberDetailModal = ({
           )}
 
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="space-y-2">
               <Label>Email</Label>
-              {isEditing ? (
-                <Input
-                  value={editData.email}
-                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                />
-              ) : (
-                <p className="p-2 bg-secondary/30 rounded-lg">{member.email}</p>
+              <p className="p-2 bg-secondary/30 rounded-lg">{member.email}</p>
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">Email cannot be changed from admin panel</p>
               )}
             </div>
             <div className="space-y-2">
               <Label>Password</Label>
-              {isEditing ? (
-                <Input type="text" value="(use reset email)" disabled />
-              ) : (
-                <p className="p-2 bg-secondary/30 rounded-lg font-mono">
-                  {member.password || '••••••••'}
-                </p>
+              <p className="p-2 bg-secondary/30 rounded-lg font-mono">••••••••</p>
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">Use "Reset Password" button above</p>
               )}
             </div>
             <div className="space-y-2">
