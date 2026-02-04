@@ -26,12 +26,7 @@ import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDa
 import { toast } from 'sonner';
 import { ref, update } from 'firebase/database';
 import { database, auth } from '@/lib/firebase';
-import { 
-  updateEmail, 
-  updatePassword, 
-  signInWithEmailAndPassword,
-  signOut
-} from 'firebase/auth';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 interface MemberDetailModalProps {
   member: Member | null;
@@ -59,6 +54,7 @@ const MemberDetailModal = ({
     monthlyFee: 500,
   });
   const [currentMonth] = useState(new Date());
+  const [sendingReset, setSendingReset] = useState(false);
 
   // Calendar data
   const monthStart = startOfMonth(currentMonth);
@@ -129,83 +125,42 @@ const MemberDetailModal = ({
 
   const handleSave = async () => {
     if (!member) return;
-    
+
     setIsSaving(true);
-    const currentAdminEmail = auth.currentUser?.email;
-    const currentAdminUid = auth.currentUser?.uid;
-    
     try {
-      // Check if email or password changed
-      const emailChanged = editData.email !== member.email;
-      const passwordChanged = editData.password !== member.password && editData.password !== '';
-      
-      let authUpdateSuccess = true;
-      let authUpdateError = '';
-      
-      if (emailChanged || passwordChanged) {
-        // We need to sign in as the member to update their credentials
-        if (!member.password) {
-          // Just update database, warn about auth
-          authUpdateSuccess = false;
-          authUpdateError = 'Stored password missing - only database record will be updated';
-        } else {
-          try {
-            // Temporarily sign in as the member
-            await signInWithEmailAndPassword(auth, member.email, member.password);
-            
-            try {
-              // Update email if changed
-              if (emailChanged && auth.currentUser) {
-                await updateEmail(auth.currentUser, editData.email);
-              }
-              
-              // Update password if changed
-              if (passwordChanged && auth.currentUser) {
-                await updatePassword(auth.currentUser, editData.password);
-              }
-            } finally {
-              // Sign out from member account
-              await signOut(auth);
-            }
-          } catch (authError: any) {
-            console.error('Auth update failed:', authError);
-            authUpdateSuccess = false;
-            if (authError.code === 'auth/invalid-credential' || authError.code === 'auth/invalid-login-credentials') {
-              authUpdateError = 'Stored password is outdated. Database updated but Firebase Auth credentials unchanged. Member should use "Forgot Password" to reset.';
-            } else {
-              authUpdateError = authError.message || 'Could not update auth credentials';
-            }
-          }
-        }
-      }
-      
-      // Always update database record
+      // IMPORTANT: Updating another user's Firebase Auth email/password from the client is not reliable/secure.
+      // We only update the member profile fields in the database, and use password-reset email for credential changes.
       const memberRef = ref(database, `members/${member.id}`);
       await update(memberRef, {
+        // keep email editable for profile/reference, but it does not guarantee Auth email changes
         email: editData.email,
-        password: editData.password || member.password,
         phone: editData.phone,
         address: editData.address,
         seatNumber: editData.seatNumber,
         monthlyFee: editData.monthlyFee,
       });
-      
-      if (authUpdateSuccess && (emailChanged || passwordChanged)) {
-        toast.success('Member updated successfully! Credentials synced with Firebase Auth. Please re-login.');
-        window.location.reload();
-      } else if (!authUpdateSuccess && (emailChanged || passwordChanged)) {
-        toast.warning(authUpdateError, { duration: 8000 });
-        toast.info('Database record updated. For auth sync, ask member to reset password via login page.');
-      } else {
-        toast.success('Member updated successfully');
-      }
-      
+
+      toast.success('Member updated successfully');
       setIsEditing(false);
     } catch (error: any) {
       console.error('Error updating member:', error);
       toast.error(error.message || 'Failed to update member');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSendReset = async () => {
+    if (!member?.email) return;
+    setSendingReset(true);
+    try {
+      await sendPasswordResetEmail(auth, member.email);
+      toast.success(`Password reset link sent to ${member.email}`);
+    } catch (e: any) {
+      console.error('Password reset email failed:', e);
+      toast.error(e?.message || 'Failed to send reset email');
+    } finally {
+      setSendingReset(false);
     }
   };
 
@@ -257,11 +212,26 @@ const MemberDetailModal = ({
           </div>
 
           {/* Profile Details */}
-          {/* Warning for credential changes */}
-          {isEditing && (editData.email !== member.email || (editData.password !== member.password && editData.password !== '')) && (
-            <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              <span>Changing email/password will update Firebase Auth credentials. You will need to re-login as admin after saving.</span>
+          {/* Credential note */}
+          {isEditing && (
+            <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div className="space-y-2">
+                <p>
+                  Member login password can’t be changed securely from the admin panel in this build.
+                  Use <span className="font-medium">Reset Password</span> to send a reset link.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={handleSendReset}
+                  disabled={sendingReset}
+                >
+                  {sendingReset ? 'Sending...' : 'Reset Password (Email)'}
+                </Button>
+              </div>
             </div>
           )}
 
@@ -280,12 +250,7 @@ const MemberDetailModal = ({
             <div className="space-y-2">
               <Label>Password</Label>
               {isEditing ? (
-                <Input
-                  type="text"
-                  value={editData.password}
-                  onChange={(e) => setEditData({ ...editData, password: e.target.value })}
-                  placeholder="Enter new password"
-                />
+                <Input type="text" value="(use reset email)" disabled />
               ) : (
                 <p className="p-2 bg-secondary/30 rounded-lg font-mono">
                   {member.password || '••••••••'}

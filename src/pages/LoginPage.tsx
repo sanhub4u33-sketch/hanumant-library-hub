@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const LoginPage = () => {
   const [loginType, setLoginType] = useState<'admin' | 'user' | null>(null);
@@ -33,6 +35,20 @@ const LoginPage = () => {
       toast.error(error.message || 'Invalid credentials');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast.error('Enter your email first');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success('Password reset email sent');
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      toast.error(error.message || 'Failed to send reset email');
     }
   };
 
@@ -150,6 +166,13 @@ const LoginPage = () => {
                 required
                 className="input-field"
               />
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Forgot password?
+              </button>
             </div>
 
             <Button 
