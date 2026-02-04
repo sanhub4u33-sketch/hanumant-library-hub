@@ -21,17 +21,27 @@ const ReceiptsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
 
+  const safeParseISO = (value?: string) => {
+    if (!value) return null;
+    try {
+      return parseISO(value);
+    } catch {
+      return null;
+    }
+  };
+
   const paidDues = useMemo(() => {
     return dues
-      .filter(due => due.status === 'paid' && due.receiptNumber)
-      .sort((a, b) => new Date(b.paidDate!).getTime() - new Date(a.paidDate!).getTime());
+      .filter(due => due.status === 'paid' && !!due.receiptNumber)
+      .sort((a, b) => new Date(b.paidDate || 0).getTime() - new Date(a.paidDate || 0).getTime());
   }, [dues]);
 
   const filteredReceipts = useMemo(() => {
     let filtered = paidDues;
 
     if (selectedPeriod !== 'all') {
-      filtered = filtered.filter(due => due.periodStart.startsWith(selectedPeriod.slice(0, 7)));
+      const periodKey = selectedPeriod.slice(0, 7);
+      filtered = filtered.filter(due => (due.periodStart || '').startsWith(periodKey));
     }
 
     if (searchQuery) {
@@ -45,7 +55,11 @@ const ReceiptsPage = () => {
   }, [paidDues, selectedPeriod, searchQuery]);
 
   const availablePeriods = useMemo(() => {
-    const periods = new Set(paidDues.map(due => due.periodStart.slice(0, 7)));
+    const periods = new Set(
+      paidDues
+        .map(due => due.periodStart?.slice(0, 7))
+        .filter((p): p is string => !!p)
+    );
     return Array.from(periods).sort().reverse();
   }, [paidDues]);
 
@@ -157,11 +171,11 @@ const ReceiptsPage = () => {
             </div>
             <div class="detail-item">
               <label>Fee Period</label>
-              <span>${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM yyyy')}</span>
+              <span>${safeParseISO(due.periodStart) && safeParseISO(due.periodEnd) ? `${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM yyyy')}` : 'N/A'}</span>
             </div>
             <div class="detail-item">
               <label>Payment Date</label>
-              <span>${format(new Date(due.paidDate!), 'dd MMM yyyy')}</span>
+              <span>${due.paidDate ? format(new Date(due.paidDate), 'dd MMM yyyy') : 'N/A'}</span>
             </div>
           </div>
 
@@ -238,7 +252,9 @@ const ReceiptsPage = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Period</span>
                   <span className="text-sm">
-                    {format(parseISO(due.periodStart), 'dd MMM')} - {format(parseISO(due.periodEnd), 'dd MMM')}
+                    {safeParseISO(due.periodStart) && safeParseISO(due.periodEnd)
+                      ? `${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM')}`
+                      : 'N/A'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -247,7 +263,7 @@ const ReceiptsPage = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Paid On</span>
-                  <span className="text-sm">{format(new Date(due.paidDate!), 'dd MMM yyyy')}</span>
+                  <span className="text-sm">{due.paidDate ? format(new Date(due.paidDate), 'dd MMM yyyy') : 'N/A'}</span>
                 </div>
               </div>
 
