@@ -41,7 +41,7 @@ const AttendancePage = () => {
     }
 
     const monthStr = format(currentMonth, 'yyyy-MM');
-    filtered = filtered.filter(record => record.date.startsWith(monthStr));
+    filtered = filtered.filter(record => record.date?.startsWith(monthStr));
 
     if (searchQuery) {
       filtered = filtered.filter(record =>
