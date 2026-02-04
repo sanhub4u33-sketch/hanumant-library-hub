@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Member, FeeRecord, AttendanceRecord } from '@/types/library';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, differenceInMinutes } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { toast } from 'sonner';
 import { ref, update } from 'firebase/database';
 import { database } from '@/lib/firebase';
@@ -57,9 +57,21 @@ const MemberDetailModal = ({
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
+  const safeParseISO = (value?: string) => {
+    if (!value) return null;
+    try {
+      return parseISO(value);
+    } catch {
+      return null;
+    }
+  };
+
   const getAttendanceForDay = (date: Date) => {
     return memberAttendance.find(record => 
-      isSameDay(parseISO(record.date), date)
+      (() => {
+        const recordDate = safeParseISO(record.date);
+        return recordDate ? isSameDay(recordDate, date) : false;
+      })()
     );
   };
 
@@ -161,7 +173,7 @@ const MemberDetailModal = ({
             <div className="flex-1">
               <h2 className="font-display text-2xl font-bold text-foreground">{member.name}</h2>
               <p className="text-muted-foreground">
-                Member since {format(parseISO(member.joinDate), 'MMMM d, yyyy')}
+                Member since {safeParseISO(member.joinDate) ? format(parseISO(member.joinDate), 'MMMM d, yyyy') : 'N/A'}
               </p>
               <span className={`inline-block mt-2 text-sm px-3 py-1 rounded-full ${
                 member.status === 'active' 
@@ -343,10 +355,12 @@ const MemberDetailModal = ({
                   >
                     <div>
                       <p className="font-medium text-foreground text-sm">
-                        {format(parseISO(due.periodStart), 'dd MMM')} - {format(parseISO(due.periodEnd), 'dd MMM yyyy')}
+                        {due.periodStart && due.periodEnd && safeParseISO(due.periodStart) && safeParseISO(due.periodEnd)
+                          ? `${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM yyyy')}`
+                          : 'Period not set'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Due: {format(parseISO(due.dueDate), 'dd MMM yyyy')}
+                        Due: {due.dueDate && safeParseISO(due.dueDate) ? format(parseISO(due.dueDate), 'dd MMM yyyy') : 'Not set'}
                       </p>
                     </div>
                     <div className="text-right">
