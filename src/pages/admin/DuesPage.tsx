@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { useMembers, useDues } from '@/hooks/useFirebaseData';
 import { toast } from 'sonner';
-import { format, parseISO, subWeeks, subMonths, subYears, isAfter } from 'date-fns';
+import { format, parseISO, subDays, subWeeks, subMonths, subYears, isAfter } from 'date-fns';
 
 const DuesPage = () => {
   const { members } = useMembers();
@@ -113,11 +113,14 @@ const DuesPage = () => {
   };
 
   // Transaction History Export Functions
-  const exportToExcel = (period: 'weekly' | 'monthly' | 'yearly') => {
+  const getFilteredTransactions = (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
     const now = new Date();
     let startDate: Date;
     
     switch (period) {
+      case 'daily':
+        startDate = subDays(now, 1);
+        break;
       case 'weekly':
         startDate = subWeeks(now, 1);
         break;
@@ -129,11 +132,16 @@ const DuesPage = () => {
         break;
     }
 
-    const paidInPeriod = dues.filter(due => 
+    return dues.filter(due => 
       due.status === 'paid' && 
       due.paidDate && 
       isAfter(parseISO(due.paidDate), startDate)
     );
+  };
+
+  const exportToExcel = (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
+    const now = new Date();
+    const paidInPeriod = getFilteredTransactions(period);
 
     if (paidInPeriod.length === 0) {
       toast.error(`No transactions found for ${period} period`);
@@ -161,7 +169,82 @@ const DuesPage = () => {
     a.click();
     URL.revokeObjectURL(url);
     
-    toast.success(`${period.charAt(0).toUpperCase() + period.slice(1)} report downloaded`);
+    toast.success(`${period.charAt(0).toUpperCase() + period.slice(1)} Excel report downloaded`);
+  };
+
+  const exportToPDF = (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
+    const now = new Date();
+    const paidInPeriod = getFilteredTransactions(period);
+
+    if (paidInPeriod.length === 0) {
+      toast.error(`No transactions found for ${period} period`);
+      return;
+    }
+
+    const totalAmount = paidInPeriod.reduce((sum, due) => sum + due.amount, 0);
+    const periodLabel = period.charAt(0).toUpperCase() + period.slice(1);
+
+    // Create PDF content as HTML
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fee Transactions - ${periodLabel} Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
+          h1 { color: #1a1a2e; border-bottom: 2px solid #4a4a6a; padding-bottom: 10px; }
+          .meta { color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          tr:nth-child(even) { background-color: #fafafa; }
+          .total { margin-top: 20px; font-size: 18px; font-weight: bold; }
+          .footer { margin-top: 40px; color: #888; font-size: 12px; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <h1>Fee Transactions Report</h1>
+        <p class="meta">Period: ${periodLabel} | Generated: ${format(now, 'dd MMM yyyy, hh:mm a')}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Receipt No</th>
+              <th>Member Name</th>
+              <th>Period</th>
+              <th>Amount</th>
+              <th>Paid Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${paidInPeriod.map(due => `
+              <tr>
+                <td>${due.receiptNumber || '-'}</td>
+                <td>${due.memberName}</td>
+                <td>${due.periodStart && due.periodEnd 
+                  ? `${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM yyyy')}`
+                  : 'N/A'}</td>
+                <td>₹${due.amount}</td>
+                <td>${due.paidDate ? format(parseISO(due.paidDate), 'dd MMM yyyy') : '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <p class="total">Total: ₹${totalAmount.toLocaleString()} (${paidInPeriod.length} transactions)</p>
+        <p class="footer">Library Management System</p>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+    
+    toast.success(`${periodLabel} PDF report opened for printing`);
   };
 
   const getStatusIcon = (status: string) => {
@@ -210,21 +293,53 @@ const DuesPage = () => {
 
       {/* Transaction History Export */}
       <div className="card-elevated p-4 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-4">
           <h3 className="font-semibold text-foreground">Transaction History Export</h3>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => exportToExcel('weekly')} className="gap-2">
-              <FileSpreadsheet className="w-4 h-4" />
-              Weekly
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => exportToExcel('monthly')} className="gap-2">
-              <FileSpreadsheet className="w-4 h-4" />
-              Monthly
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => exportToExcel('yearly')} className="gap-2">
-              <FileSpreadsheet className="w-4 h-4" />
-              Yearly
-            </Button>
+          
+          {/* Excel Export */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground w-16">Excel:</span>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => exportToExcel('daily')} className="gap-2">
+                <FileSpreadsheet className="w-4 h-4" />
+                Daily
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportToExcel('weekly')} className="gap-2">
+                <FileSpreadsheet className="w-4 h-4" />
+                Weekly
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportToExcel('monthly')} className="gap-2">
+                <FileSpreadsheet className="w-4 h-4" />
+                Monthly
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportToExcel('yearly')} className="gap-2">
+                <FileSpreadsheet className="w-4 h-4" />
+                Yearly
+              </Button>
+            </div>
+          </div>
+          
+          {/* PDF Export */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground w-16">PDF:</span>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => exportToPDF('daily')} className="gap-2">
+                <Download className="w-4 h-4" />
+                Daily
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportToPDF('weekly')} className="gap-2">
+                <Download className="w-4 h-4" />
+                Weekly
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportToPDF('monthly')} className="gap-2">
+                <Download className="w-4 h-4" />
+                Monthly
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportToPDF('yearly')} className="gap-2">
+                <Download className="w-4 h-4" />
+                Yearly
+              </Button>
+            </div>
           </div>
         </div>
       </div>
