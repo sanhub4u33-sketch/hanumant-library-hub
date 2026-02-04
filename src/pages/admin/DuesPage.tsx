@@ -181,7 +181,8 @@ const DuesPage = () => {
       return;
     }
 
-    const totalAmount = paidInPeriod.reduce((sum, due) => sum + due.amount, 0);
+    // Ensure numeric addition by converting to Number
+    const totalAmount = paidInPeriod.reduce((sum, due) => sum + Number(due.amount), 0);
     const periodLabel = period.charAt(0).toUpperCase() + period.slice(1);
 
     // Create PDF content as HTML
@@ -200,6 +201,10 @@ const DuesPage = () => {
           tr:nth-child(even) { background-color: #fafafa; }
           .total { margin-top: 20px; font-size: 18px; font-weight: bold; }
           .footer { margin-top: 40px; color: #888; font-size: 12px; text-align: center; }
+          @media print {
+            body { padding: 20px; }
+            button { display: none; }
+          }
         </style>
       </head>
       <body>
@@ -223,7 +228,7 @@ const DuesPage = () => {
                 <td>${due.periodStart && due.periodEnd 
                   ? `${format(parseISO(due.periodStart), 'dd MMM')} - ${format(parseISO(due.periodEnd), 'dd MMM yyyy')}`
                   : 'N/A'}</td>
-                <td>₹${due.amount}</td>
+                <td>₹${Number(due.amount).toLocaleString()}</td>
                 <td>${due.paidDate ? format(parseISO(due.paidDate), 'dd MMM yyyy') : '-'}</td>
               </tr>
             `).join('')}
@@ -231,20 +236,23 @@ const DuesPage = () => {
         </table>
         <p class="total">Total: ₹${totalAmount.toLocaleString()} (${paidInPeriod.length} transactions)</p>
         <p class="footer">Library Management System</p>
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
       </body>
       </html>
     `;
 
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-      };
-    }
+    // Create blob and download as HTML file that auto-prints
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fee_report_${period}_${format(now, 'yyyy-MM-dd')}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
     
-    toast.success(`${periodLabel} PDF report opened for printing`);
+    toast.success(`${periodLabel} report downloaded. Open the file and use browser Print > Save as PDF`);
   };
 
   const getStatusIcon = (status: string) => {
