@@ -1,0 +1,21 @@
+ {
+   "name": "Library",
+   "short_name": "Library",
+   "description": "Shri Hanumant Library - Digital Library & Study Center",
+   "theme_color": "#f97316",
+   "background_color": "#fffcf5",
+   "display": "standalone",
+   "scope": "/",
+   "start_url": "/",
+   "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/library-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+   "categories": ["education", "productivity"],
+   "lang": "en-IN"
+ }
