@@ -27,12 +27,21 @@ const HomePage = () => {
     if (!pwa) return;
     if (loading) return;
 
-    if (user && userRole) {
-      navigate(userRole === 'admin' ? '/admin' : '/user', { replace: true });
+    // PWA cold-starts on Android can restore the Firebase session first, and resolve role later.
+    // To avoid dropping the user on the public homepage (showing a Login button) after reopen,
+    // route any authenticated user straight to their dashboard.
+    if (user) {
+      const isOwnerAdmin = user.email === 'owner@gmail.com';
+      const target = isOwnerAdmin ? '/admin' : '/user';
+      navigate(target, { replace: true });
+      return;
     }
+
+    // Non-PWA web visits should stay on the marketing homepage.
+    // (No action needed.)
   }, [pwa, loading, user, userRole, navigate]);
 
-  if (pwa && (loading || (user && userRole))) {
+  if (pwa && (loading || !!user)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
