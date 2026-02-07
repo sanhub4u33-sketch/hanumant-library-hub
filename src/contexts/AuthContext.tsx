@@ -36,18 +36,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const determineUserRole = useCallback(async (currentUser: User) => {
     try {
-      // Check if user is admin (owner@gmail.com)
-      if (currentUser.email === 'owner@gmail.com') {
+      // Check if user is an admin by looking up admins node in Firebase
+      const adminRef = ref(database, `admins/${currentUser.uid}`);
+      const adminSnapshot = await get(adminRef);
+      if (adminSnapshot.exists()) {
         setUserRole('admin');
+        return;
+      }
+
+      // Check if user exists in members
+      const memberRef = ref(database, `members/${currentUser.uid}`);
+      const snapshot = await get(memberRef);
+      if (snapshot.exists()) {
+        setUserRole('user');
       } else {
-        // Check if user exists in members
-        const memberRef = ref(database, `members/${currentUser.uid}`);
-        const snapshot = await get(memberRef);
-        if (snapshot.exists()) {
-          setUserRole('user');
-        } else {
-          setUserRole(null);
-        }
+        setUserRole(null);
       }
     } catch (error) {
       console.error('Error determining user role:', error);
@@ -115,12 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) {
       setRoleLoading(false);
       setUserRole(null);
-      return;
-    }
-
-    if (user.email === 'owner@gmail.com') {
-      setRoleLoading(false);
-      setUserRole('admin');
       return;
     }
 
